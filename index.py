@@ -1,4 +1,3 @@
-# Install required library first:
 # pip install streamlit dateparser
 
 import streamlit as st
@@ -11,10 +10,9 @@ import dateparser
 # -------------------------------
 def get_date_range_from_expression(expression: str):
     now = datetime.now()
-
     expression = expression.lower().strip()
 
-    # Handle quarter-based expressions
+    # Quarter-based expressions
     quarter_match = re.match(r"(1st|first|2nd|second|3rd|third|4th|fourth|q1|q2|q3|q4)\s*(quarter)?\s*(of|in)?\s*(\d{4})", expression)
     if quarter_match:
         quarter_map = {
@@ -25,12 +23,12 @@ def get_date_range_from_expression(expression: str):
         }
         quarter_key = quarter_match.group(1)
         year = int(quarter_match.group(4))
-        quarter = quarter_map[quarter_key]
-        start_date = datetime(year, quarter[0], 1)
-        end_date = datetime(year, quarter[1] + 1, 1) - timedelta(days=1) if quarter[1] < 12 else datetime(year + 1, 1, 1) - timedelta(days=1)
+        start_month, end_month = quarter_map[quarter_key]
+        start_date = datetime(year, start_month, 1)
+        end_date = datetime(year, end_month + 1, 1) - timedelta(days=1) if end_month < 12 else datetime(year + 1, 1, 1) - timedelta(days=1)
         return start_date.date(), end_date.date()
 
-    # Handle week/month specific logic
+    # Week/month expressions
     if expression == "yesterday":
         d = now - timedelta(days=1)
         return d.date(), d.date()
@@ -62,26 +60,47 @@ def get_date_range_from_expression(expression: str):
         end = next_month - timedelta(days=1)
         return start.date(), end.date()
 
-    # Try parsing a single date (fallback)
+    # Fallback to parsing single date
     start = dateparser.parse(expression)
     if start:
         return start.date(), start.date()
 
-    # If everything fails
-    raise ValueError("Could not parse the time expression. Try expressions like 'last week', 'Q1 2024', or '10 July 2025'.")
+    # If nothing matches
+    raise ValueError("❌ Couldn't parse the expression. Try 'Q2 2024', 'last month', 'today', etc.")
 
 # -------------------------------
-# Streamlit UI
+# Streamlit Chatbot UI
 # -------------------------------
-st.set_page_config(page_title="🗓️ Date Expression Parser", layout="centered")
-st.title("🧠 Natural Language Date Parser")
-st.markdown("Enter a natural time expression (e.g., `last week`, `Q1 2023`, `yesterday`, `third quarter of 2024`)")
+st.set_page_config(page_title="🧠 Date Expression Chatbot", layout="centered")
+st.title("🧠 Natural Language Date Chatbot")
 
-user_input = st.text_input("🗨️ Time Frame Expression")
+# Session state to track messages
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "Hi! 🤖 Enter a time expression like **'last week'**, **'Q1 2024'**, or **'10 July 2025'** and I'll tell you the date range."}
+    ]
+
+# Display messages
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# Input from user
+user_input = st.chat_input("Enter time frame expression...")
 
 if user_input:
+    # Show user message
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
     try:
         start_date, end_date = get_date_range_from_expression(user_input)
-        st.success(f"✅ Start Date: **{start_date}**\n\n✅ End Date: **{end_date}**")
+        response = f"✅ Start Date: **{start_date}**\n\n✅ End Date: **{end_date}**"
     except ValueError as e:
-        st.error(str(e))
+        response = str(e)
+
+    # Show assistant response
+    st.session_state.messages.append({"role": "assistant", "content": response})
+    with st.chat_message("assistant"):
+        st.markdown(response)
